@@ -755,7 +755,9 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
         // final check to exit early before starting to run
         ensureNotCanceled();
 
-        scheduleBufferDebloater();
+        if (bufferDebloater != null) {
+            scheduleBufferDebloater();
+        }
 
         // let the task do its work
         runMailboxLoop();
@@ -789,8 +791,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
 
     @VisibleForTesting
     void debloat() {
-        long throughput = throughputCalculator.calculateThroughput();
         if (bufferDebloater != null) {
+            long throughput = throughputCalculator.calculateThroughput();
             bufferDebloater.recalculateBufferSize(throughput);
         }
     }

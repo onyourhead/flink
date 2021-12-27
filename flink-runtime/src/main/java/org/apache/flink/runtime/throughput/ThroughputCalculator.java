@@ -20,8 +20,12 @@ package org.apache.flink.runtime.throughput;
 
 import org.apache.flink.util.clock.Clock;
 
+import org.slf4j.Logger;
+import org.slf4j.LoggerFactory;
+
 /** Class for measuring the throughput based on incoming data size and measurement period. */
 public class ThroughputCalculator {
+    protected static final Logger LOG = LoggerFactory.getLogger(ThroughputCalculator.class);
     private static final long NOT_TRACKED = -1;
     private final Clock clock;
     private final ThroughputEMA throughputEMA;
