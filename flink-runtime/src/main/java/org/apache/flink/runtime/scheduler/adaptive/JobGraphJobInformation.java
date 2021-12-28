@@ -83,7 +83,7 @@ public class JobGraphJobInformation implements JobInformation {
         return InstantiationUtil.clone(jobGraph);
     }
 
-    private static final class JobVertexInformation implements JobInformation.VertexInformation {
+    public static final class JobVertexInformation implements JobInformation.VertexInformation {
 
         private final JobVertex jobVertex;
 
@@ -93,6 +93,10 @@ public class JobGraphJobInformation implements JobInformation {
                 JobVertex jobVertex, VertexParallelismInformation parallelismInfo) {
             this.jobVertex = jobVertex;
             this.parallelismInfo = parallelismInfo;
+        }
+
+        public JobVertex getJobVertex() {
+            return jobVertex;
         }
 
         @Override

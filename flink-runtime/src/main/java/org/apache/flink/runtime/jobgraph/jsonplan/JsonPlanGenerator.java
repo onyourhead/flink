@@ -83,6 +83,7 @@ public class JsonPlanGenerator {
                 // write the core properties
                 gen.writeStringField("id", vertex.getID().toString());
                 gen.writeNumberField("parallelism", vertex.getParallelism());
+                gen.writeStringField("slot_group", vertex.getSlotSharingGroup().getSlotSharingGroupId().toString());
                 gen.writeStringField("operator", operator);
                 gen.writeStringField("operator_strategy", operatorDescr);
                 gen.writeStringField("description", description);
