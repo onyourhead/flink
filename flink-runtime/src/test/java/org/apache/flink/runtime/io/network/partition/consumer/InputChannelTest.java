@@ -134,7 +134,7 @@ public class InputChannelTest {
         }
 
         @Override
-        public void resumeConsumption() {}
+        public void resumeConsumption(boolean force) {}
 
         @Override
         public void acknowledgeAllRecordsProcessed() throws IOException {}

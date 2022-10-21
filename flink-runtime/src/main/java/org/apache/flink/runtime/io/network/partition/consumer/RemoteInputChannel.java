@@ -147,6 +147,10 @@ public class RemoteInputChannel extends InputChannel {
         this.channelStatePersister = new ChannelStatePersister(stateWriter, getChannelInfo());
     }
 
+    public int getExpectedSequenceNumber() {
+        return expectedSequenceNumber;
+    }
+
     @VisibleForTesting
     void setExpectedSequenceNumber(int expectedSequenceNumber) {
         this.expectedSequenceNumber = expectedSequenceNumber;
@@ -387,7 +391,7 @@ public class RemoteInputChannel extends InputChannel {
     }
 
     @Override
-    public void resumeConsumption() throws IOException {
+    public void resumeConsumption(boolean force) throws IOException {
         checkState(!isReleased.get(), "Channel released.");
         checkPartitionRequestQueueInitialized();
 
@@ -811,6 +815,22 @@ public class RemoteInputChannel extends InputChannel {
         checkState(
                 partitionRequestClient != null,
                 "Bug: partitionRequestClient is not initialized before processing data and no error is detected.");
+    }
+
+    @Override
+    public UnknownInputChannel toUnknownInputChannel() {
+        return new UnknownInputChannel(inputGate,
+                channelInfo.getInputChannelIdx(),
+                partitionId,
+                consumedSubpartitionIndex,
+                null,
+                null,
+                connectionManager,
+                initialBackoff,
+                maxBackoff,
+                initialCredit,
+                numBytesIn,
+                numBuffersIn);
     }
 
     private static class BufferReorderingException extends IOException {

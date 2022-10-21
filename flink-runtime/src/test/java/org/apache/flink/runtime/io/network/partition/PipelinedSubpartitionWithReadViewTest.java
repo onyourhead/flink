@@ -583,7 +583,7 @@ public class PipelinedSubpartitionWithReadViewTest {
     }
 
     private void resumeConsumptionAndCheckAvailability(int availableCredit, boolean dataAvailable) {
-        readView.resumeConsumption();
+        readView.resumeConsumption(false);
 
         assertEquals(
                 dataAvailable, readView.getAvailabilityAndBacklog(availableCredit).isAvailable());

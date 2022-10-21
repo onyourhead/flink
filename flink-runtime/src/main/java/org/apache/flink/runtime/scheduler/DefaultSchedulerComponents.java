@@ -30,6 +30,7 @@ import org.apache.flink.runtime.jobmaster.slotpool.PhysicalSlotRequestBulkChecke
 import org.apache.flink.runtime.jobmaster.slotpool.SlotPool;
 import org.apache.flink.runtime.jobmaster.slotpool.SlotSelectionStrategy;
 import org.apache.flink.runtime.scheduler.strategy.PipelinedRegionSchedulingStrategy;
+import org.apache.flink.runtime.scheduler.strategy.PipelinedSingleSchedulingStrategy;
 import org.apache.flink.runtime.scheduler.strategy.SchedulingStrategyFactory;
 import org.apache.flink.runtime.util.SlotSelectionStrategyUtils;
 import org.apache.flink.util.clock.SystemClock;
@@ -105,7 +106,7 @@ public class DefaultSchedulerComponents {
                         bulkChecker,
                         slotRequestTimeout);
         return new DefaultSchedulerComponents(
-                new PipelinedRegionSchedulingStrategy.Factory(),
+                new PipelinedSingleSchedulingStrategy.Factory(),
                 bulkChecker::start,
                 allocatorFactory);
     }

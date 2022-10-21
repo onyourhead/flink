@@ -262,6 +262,8 @@ public abstract class StreamTask<OUT, OP extends StreamOperator<OUT>>
      */
     private volatile boolean failing;
 
+    private volatile boolean suspended;
+
     /** Flags indicating the finished method of all the operators are called. */
     private boolean finishedOperators;
 

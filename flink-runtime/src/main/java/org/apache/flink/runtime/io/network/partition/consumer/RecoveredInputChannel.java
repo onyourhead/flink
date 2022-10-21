@@ -210,7 +210,7 @@ public abstract class RecoveredInputChannel extends InputChannel implements Chan
     }
 
     @Override
-    public void resumeConsumption() {
+    public void resumeConsumption(boolean force) {
         throw new UnsupportedOperationException("RecoveredInputChannel should never be blocked.");
     }
 

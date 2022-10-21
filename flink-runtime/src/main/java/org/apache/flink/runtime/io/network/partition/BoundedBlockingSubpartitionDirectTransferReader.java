@@ -169,7 +169,7 @@ public class BoundedBlockingSubpartitionDirectTransferReader implements ResultSu
     }
 
     @Override
-    public void resumeConsumption() {
+    public void resumeConsumption(boolean force) {
         throw new UnsupportedOperationException("Method should never be called.");
     }
 

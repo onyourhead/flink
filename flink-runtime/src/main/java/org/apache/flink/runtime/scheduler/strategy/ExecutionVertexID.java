@@ -33,6 +33,8 @@ public class ExecutionVertexID implements VertexID {
 
     private final int subtaskIndex;
 
+    private boolean needUpdateConsumer;
+
     public ExecutionVertexID(JobVertexID jobVertexId, int subtaskIndex) {
         checkArgument(subtaskIndex >= 0, "subtaskIndex must be greater than or equal to 0");
 
@@ -46,6 +48,14 @@ public class ExecutionVertexID implements VertexID {
 
     public int getSubtaskIndex() {
         return subtaskIndex;
+    }
+
+    public boolean isNeedUpdateConsumer() {
+        return needUpdateConsumer;
+    }
+
+    public void setNeedUpdateConsumer(boolean needUpdateConsumer) {
+        this.needUpdateConsumer = needUpdateConsumer;
     }
 
     public void writeTo(ByteBuf buf) {

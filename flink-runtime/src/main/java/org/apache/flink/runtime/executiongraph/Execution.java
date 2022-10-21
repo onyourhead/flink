@@ -705,7 +705,7 @@ public class Execution
         return releaseFuture;
     }
 
-    private void updatePartitionConsumers(final IntermediateResultPartition partition) {
+    void updatePartitionConsumers(final IntermediateResultPartition partition) {
         final Optional<ConsumerVertexGroup> consumerVertexGroup =
                 partition.getConsumerVertexGroupOptional();
         if (!consumerVertexGroup.isPresent()) {

@@ -1414,7 +1414,7 @@ public class RemoteInputChannelTest {
         RemoteInputChannel remoteChannel = createRemoteInputChannel(inputGate);
 
         remoteChannel.releaseAllResources();
-        remoteChannel.resumeConsumption();
+        remoteChannel.resumeConsumption(false);
     }
 
     @Test(expected = IllegalStateException.class)
@@ -1459,8 +1459,8 @@ public class RemoteInputChannelTest {
         assertEquals(4, remoteChannel1.getNumberOfAvailableBuffers());
         assertEquals(0, remoteChannel2.getNumberOfAvailableBuffers());
 
-        remoteChannel1.resumeConsumption();
-        remoteChannel2.resumeConsumption();
+        remoteChannel1.resumeConsumption(false);
+        remoteChannel2.resumeConsumption(false);
 
         assertEquals(4, remoteChannel1.getUnannouncedCredit());
         assertEquals(0, remoteChannel2.getUnannouncedCredit());

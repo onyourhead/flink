@@ -571,6 +571,17 @@ public class SingleInputGate extends IndexedInputGate {
                         new SubpartitionInfo(partitionId, subpartitionIndex);
                 InputChannel current = inputChannels.get(subpartitionInfo);
 
+                int oldExpectedSequenceNumber = 0;
+                if (!(current instanceof UnknownInputChannel)) {
+                    InputChannel oldChannel = current;
+                    if (oldChannel instanceof RemoteInputChannel) {
+                        oldExpectedSequenceNumber = ((RemoteInputChannel) oldChannel).getExpectedSequenceNumber();
+                    }
+                    current.setPartitionId(shuffleDescriptor.getResultPartitionID());
+                    current = current.toUnknownInputChannel();
+                    oldChannel.releaseAllResources();
+                }
+
                 if (current instanceof UnknownInputChannel) {
                     UnknownInputChannel unknownChannel = (UnknownInputChannel) current;
                     boolean isLocal = shuffleDescriptor.isLocalTo(localLocation);
@@ -582,6 +593,9 @@ public class SingleInputGate extends IndexedInputGate {
                                 unknownChannel.toRemoteInputChannel(
                                         shuffleDescriptor.getConnectionId());
                         remoteInputChannel.setup();
+                        if (oldExpectedSequenceNumber != 0){
+                            remoteInputChannel.setExpectedSequenceNumber(oldExpectedSequenceNumber);
+                        }
                         newChannel = remoteInputChannel;
                     }
                     LOG.debug(
@@ -592,6 +606,7 @@ public class SingleInputGate extends IndexedInputGate {
 
                     if (requestedPartitionsFlag) {
                         newChannel.requestSubpartition();
+//                        newChannel.resumeConsumption(true);
                     }
 
                     for (TaskEvent event : pendingEvents) {
@@ -938,7 +953,7 @@ public class SingleInputGate extends IndexedInputGate {
         // are allocated together so there should be no UnknownInputChannel. As a result, it
         // is safe to not synchronize the requestLock here. We will refactor the code to not
         // rely on this assumption in the future.
-        channels[channelInfo.getInputChannelIdx()].resumeConsumption();
+        channels[channelInfo.getInputChannelIdx()].resumeConsumption(false);
     }
 
     @Override

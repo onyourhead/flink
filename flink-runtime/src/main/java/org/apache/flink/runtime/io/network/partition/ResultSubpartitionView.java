@@ -51,7 +51,7 @@ public interface ResultSubpartitionView {
 
     boolean isReleased();
 
-    void resumeConsumption();
+    void resumeConsumption(boolean force);
 
     void acknowledgeAllDataProcessed();
 

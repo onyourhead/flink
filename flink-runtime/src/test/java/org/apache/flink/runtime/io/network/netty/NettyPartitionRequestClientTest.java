@@ -221,7 +221,7 @@ public class NettyPartitionRequestClientTest {
             inputGate.setupChannels();
             inputChannel.requestSubpartition();
 
-            inputChannel.resumeConsumption();
+            inputChannel.resumeConsumption(false);
             channel.runPendingTasks();
             Object readFromOutbound = channel.readOutbound();
             assertThat(readFromOutbound, instanceOf(PartitionRequest.class));

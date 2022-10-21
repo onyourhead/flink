@@ -22,6 +22,7 @@ import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.api.common.Archiveable;
 import org.apache.flink.api.common.JobID;
 import org.apache.flink.api.common.time.Time;
+import org.apache.flink.configuration.GlobalFastConfiguration;
 import org.apache.flink.core.io.InputSplit;
 import org.apache.flink.core.io.InputSplitAssigner;
 import org.apache.flink.runtime.JobException;
@@ -478,6 +479,10 @@ public class ExecutionVertex
                         + "only valid for pipelined partitions.");
 
         partition.markDataProduced();
+//        if (GlobalFastConfiguration.INSTANCE.isSingleTaskRecover() && currentExecution.getAttemptNumber() > 0) {
+        if (currentExecution.getAttemptNumber() > 0) {
+            currentExecution.updatePartitionConsumers(partition);
+        }
     }
 
     void cachePartitionInfo(PartitionInfo partitionInfo) {

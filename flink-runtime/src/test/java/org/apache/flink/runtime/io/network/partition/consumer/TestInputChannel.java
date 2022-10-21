@@ -221,7 +221,7 @@ public class TestInputChannel extends InputChannel {
     }
 
     @Override
-    public void resumeConsumption() {
+    public void resumeConsumption(boolean force) {
         isBlocked = false;
         if (actionOnResumed != null) {
             actionOnResumed.run();

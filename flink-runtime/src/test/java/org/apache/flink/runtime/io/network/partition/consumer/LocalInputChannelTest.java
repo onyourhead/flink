@@ -503,7 +503,7 @@ public class LocalInputChannelTest {
                 createLocalInputChannel(inputGate, new ResultPartitionManager());
 
         localChannel.releaseAllResources();
-        localChannel.resumeConsumption();
+        localChannel.resumeConsumption(false);
     }
 
     @Test(expected = IllegalStateException.class)
@@ -557,7 +557,7 @@ public class LocalInputChannelTest {
         assertFalse(channel.inputGate.pollNext().isPresent());
 
         // Resumption makes the subpartition available.
-        channel.resumeConsumption();
+        channel.resumeConsumption(false);
         Optional<BufferOrEvent> nextBuffer = channel.inputGate.pollNext();
         assertTrue(nextBuffer.isPresent());
         assertTrue(nextBuffer.get().isBuffer());

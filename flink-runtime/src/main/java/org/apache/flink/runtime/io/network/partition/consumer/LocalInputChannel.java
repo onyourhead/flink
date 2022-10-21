@@ -279,11 +279,11 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
     }
 
     @Override
-    public void resumeConsumption() {
+    public void resumeConsumption(boolean force) {
         checkState(!isReleased, "Channel released.");
 
         ResultSubpartitionView subpartitionView = checkNotNull(this.subpartitionView);
-        subpartitionView.resumeConsumption();
+        subpartitionView.resumeConsumption(force);
 
         if (subpartitionView.getAvailabilityAndBacklog(Integer.MAX_VALUE).isAvailable()) {
             notifyChannelNonEmpty();
@@ -378,5 +378,21 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
     @VisibleForTesting
     ResultSubpartitionView getSubpartitionView() {
         return subpartitionView;
+    }
+
+    @Override
+    public UnknownInputChannel toUnknownInputChannel() {
+        return new UnknownInputChannel(inputGate,
+                channelInfo.getInputChannelIdx(),
+                partitionId,
+                consumedSubpartitionIndex,
+                partitionManager,
+                taskEventPublisher,
+                null,
+                initialBackoff,
+                maxBackoff,
+                0,
+                numBytesIn,
+                numBuffersIn);
     }
 }

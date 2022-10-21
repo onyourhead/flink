@@ -42,6 +42,7 @@ final class ChannelStateWriteRequestDispatcherImpl implements ChannelStateWriteR
     private final ChannelStateSerializer serializer;
     private final int subtaskIndex;
     private String taskName;
+    private long lastCompletedCheckpointId;
 
     ChannelStateWriteRequestDispatcherImpl(
             String taskName,
@@ -98,7 +99,10 @@ final class ChannelStateWriteRequestDispatcherImpl implements ChannelStateWriteR
                 streamFactoryResolver.resolveCheckpointStorageLocation(
                         request.getCheckpointId(), request.getLocationReference()),
                 serializer,
-                () -> writers.remove(request.getCheckpointId()));
+                () -> {
+//                    lastCompletedCheckpointId = request.getCheckpointId();
+                    writers.remove(request.getCheckpointId());
+                });
     }
 
     @Override

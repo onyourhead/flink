@@ -226,7 +226,7 @@ public class CancelPartitionRequestTest {
         }
 
         @Override
-        public void resumeConsumption() {}
+        public void resumeConsumption(boolean force) {}
 
         @Override
         public void acknowledgeAllDataProcessed() {}

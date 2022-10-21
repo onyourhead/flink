@@ -72,6 +72,15 @@ interface ChannelStateWriteRequest {
                 (writer, buffer) -> writer.writeOutput(info, buffer));
     }
 
+    static ChannelStateWriteRequest writeConsumedBuffer(
+            long checkpointId, ResultSubpartitionInfo info, Buffer... buffers) {
+        return buildWriteRequest(
+                checkpointId,
+                "writeOutputConsumedBuffer",
+                ofElements(Buffer::recycleBuffer, buffers),
+                (writer, buffer) -> writer.writeOutput(info, buffer));
+    }
+
     static ChannelStateWriteRequest buildWriteRequest(
             long checkpointId,
             String name,

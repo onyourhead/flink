@@ -53,7 +53,7 @@ public abstract class InputChannel {
     protected final InputChannelInfo channelInfo;
 
     /** The parent partition of the subpartition consumed by this channel. */
-    protected final ResultPartitionID partitionId;
+    protected ResultPartitionID partitionId;
 
     /** The index of the subpartition consumed by this channel. */
     protected final int consumedSubpartitionIndex;
@@ -137,11 +137,12 @@ public abstract class InputChannel {
     }
 
     /**
-     * After sending a {@link org.apache.flink.runtime.io.network.api.CheckpointBarrier} of
+     * After sending a {@link CheckpointBarrier} of
      * exactly-once mode, the upstream will be blocked and become unavailable. This method tries to
      * unblock the corresponding upstream and resume data consumption.
+     * @param force flag to force notify downstream
      */
-    public abstract void resumeConsumption() throws IOException;
+    public abstract void resumeConsumption(boolean force) throws IOException;
 
     /**
      * When received {@link EndOfData} from one channel, it need to acknowledge after this event get
@@ -311,6 +312,10 @@ public abstract class InputChannel {
         return 0;
     }
 
+    public void setPartitionId(ResultPartitionID partitionId) {
+        this.partitionId = partitionId;
+    }
+
     // ------------------------------------------------------------------------
 
     /**
@@ -375,4 +380,8 @@ public abstract class InputChannel {
     }
 
     void setup() throws IOException {}
+
+    public UnknownInputChannel toUnknownInputChannel(){
+        return null;
+    }
 }

@@ -40,7 +40,7 @@ public class NoOpResultSubpartitionView implements ResultSubpartitionView {
     }
 
     @Override
-    public void resumeConsumption() {}
+    public void resumeConsumption(boolean force) {}
 
     @Override
     public void acknowledgeAllDataProcessed() {}

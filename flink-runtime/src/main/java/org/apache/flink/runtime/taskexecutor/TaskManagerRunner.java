@@ -23,6 +23,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.api.java.tuple.Tuple2;
 import org.apache.flink.configuration.AkkaOptions;
 import org.apache.flink.configuration.Configuration;
+import org.apache.flink.configuration.GlobalFastConfiguration;
 import org.apache.flink.configuration.JMXServerOptions;
 import org.apache.flink.configuration.TaskManagerOptions;
 import org.apache.flink.configuration.TaskManagerOptionsInternal;
@@ -507,6 +508,7 @@ public class TaskManagerRunner implements FatalErrorHandler {
 
     public static void runTaskManagerProcessSecurely(Configuration configuration) {
         FlinkSecurityManager.setFromConfiguration(configuration);
+        GlobalFastConfiguration.INSTANCE.setFlinkConfig(configuration);
         final PluginManager pluginManager =
                 PluginUtils.createPluginManagerFromRootFolder(configuration);
         FileSystem.initialize(configuration, pluginManager);

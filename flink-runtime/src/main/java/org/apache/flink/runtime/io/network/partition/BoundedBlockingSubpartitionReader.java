@@ -150,7 +150,7 @@ final class BoundedBlockingSubpartitionReader implements ResultSubpartitionView 
     }
 
     @Override
-    public void resumeConsumption() {
+    public void resumeConsumption(boolean force) {
         throw new UnsupportedOperationException("Method should never be called.");
     }
 

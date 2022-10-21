@@ -26,6 +26,7 @@ import org.apache.flink.configuration.ConfigOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
 import org.apache.flink.configuration.GlobalConfiguration;
+import org.apache.flink.configuration.GlobalFastConfiguration;
 import org.apache.flink.configuration.HighAvailabilityOptions;
 import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.configuration.JMXServerOptions;
@@ -283,7 +284,7 @@ public abstract class ClusterEntrypoint implements AutoCloseableAsync, FatalErro
             final DispatcherResourceManagerComponentFactory
                     dispatcherResourceManagerComponentFactory =
                             createDispatcherResourceManagerComponentFactory(configuration);
-
+            GlobalFastConfiguration.INSTANCE.setFlinkConfig(configuration);
             clusterComponent =
                     dispatcherResourceManagerComponentFactory.create(
                             configuration,

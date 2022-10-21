@@ -19,6 +19,7 @@
 package org.apache.flink.runtime.io.network.partition;
 
 import org.apache.flink.annotation.VisibleForTesting;
+import org.apache.flink.configuration.GlobalFastConfiguration;
 import org.apache.flink.runtime.checkpoint.channel.ChannelStateWriter;
 import org.apache.flink.runtime.event.AbstractEvent;
 import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
@@ -83,6 +84,8 @@ public class PipelinedSubpartition extends ResultSubpartition
     final PrioritizedDeque<BufferConsumerWithPartialRecordLength> buffers =
             new PrioritizedDeque<>();
 
+    List<Buffer> consumedBuffer = new ArrayList<>();
+
     /** The number of non-event buffers currently in this subpartition. */
     @GuardedBy("buffers")
     private int buffersInBacklog;
@@ -104,6 +107,12 @@ public class PipelinedSubpartition extends ResultSubpartition
 
     /** The total number of bytes (both data and event buffers). */
     private long totalNumberOfBytes;
+
+    private int lastCheckpointId;
+
+    private boolean finishedReplayBuffer = false;
+
+    private int replayBufferOffset = 0;
 
     /** Writes in-flight data. */
     private ChannelStateWriter channelStateWriter;
@@ -245,6 +254,14 @@ public class PipelinedSubpartition extends ResultSubpartition
         // notifications
     }
 
+    public void uploadConsumedBuffer() {
+        channelStateWriter.addOutputData(
+                lastCheckpointId,
+                subpartitionInfo,
+                ChannelStateWriter.SEQUENCE_NUMBER_UNKNOWN,
+                consumedBuffer.toArray(new Buffer[0]));
+    }
+
     @Nullable
     private CheckpointBarrier parseCheckpointBarrier(BufferConsumer bufferConsumer) {
         CheckpointBarrier barrier;
@@ -303,71 +320,80 @@ public class PipelinedSubpartition extends ResultSubpartition
 
             Buffer buffer = null;
 
-            if (buffers.isEmpty()) {
-                flushRequested = false;
-            }
-
-            while (!buffers.isEmpty()) {
-                BufferConsumerWithPartialRecordLength bufferConsumerWithPartialRecordLength =
-                        buffers.peek();
-                BufferConsumer bufferConsumer =
-                        bufferConsumerWithPartialRecordLength.getBufferConsumer();
-
-                buffer = buildSliceBuffer(bufferConsumerWithPartialRecordLength);
-
-                checkState(
-                        bufferConsumer.isFinished() || buffers.size() == 1,
-                        "When there are multiple buffers, an unfinished bufferConsumer can not be at the head of the buffers queue.");
-
-                if (buffers.size() == 1) {
-                    // turn off flushRequested flag if we drained all of the available data
+            if (GlobalFastConfiguration.INSTANCE.isSingleTaskRecover() && !consumedBuffer.isEmpty() && !finishedReplayBuffer) {
+                buffer = consumedBuffer.get(replayBufferOffset);
+                if (++replayBufferOffset == consumedBuffer.size()) {
+                    finishedReplayBuffer = true;
+                }
+            } else {
+                if (buffers.isEmpty()) {
                     flushRequested = false;
                 }
 
-                if (bufferConsumer.isFinished()) {
-                    requireNonNull(buffers.poll()).getBufferConsumer().close();
-                    decreaseBuffersInBacklogUnsafe(bufferConsumer.isBuffer());
+                while (!buffers.isEmpty()) {
+                    BufferConsumerWithPartialRecordLength bufferConsumerWithPartialRecordLength =
+                            buffers.peek();
+                    BufferConsumer bufferConsumer =
+                            bufferConsumerWithPartialRecordLength.getBufferConsumer();
+
+                    buffer = buildSliceBuffer(bufferConsumerWithPartialRecordLength);
+
+                    checkState(
+                            bufferConsumer.isFinished() || buffers.size() == 1,
+                            "When there are multiple buffers, an unfinished bufferConsumer can not be at the head of the buffers queue.");
+
+                    if (buffers.size() == 1) {
+                        // turn off flushRequested flag if we drained all of the available data
+                        flushRequested = false;
+                    }
+
+                    if (bufferConsumer.isFinished()) {
+                        requireNonNull(buffers.poll()).getBufferConsumer().close();
+                        decreaseBuffersInBacklogUnsafe(bufferConsumer.isBuffer());
+                    }
+
+                    // if we have an empty finished buffer and the exclusive credit is 0, we just return
+                    // the empty buffer so that the downstream task can release the allocated credit for
+                    // this empty buffer, this happens in two main scenarios currently:
+                    // 1. all data of a buffer builder has been read and after that the buffer builder
+                    // is finished
+                    // 2. in approximate recovery mode, a partial record takes a whole buffer builder
+                    if (receiverExclusiveBuffersPerChannel == 0 && bufferConsumer.isFinished()) {
+                        break;
+                    }
+
+                    if (buffer.readableBytes() > 0) {
+                        break;
+                    }
+                    buffer.recycleBuffer();
+                    buffer = null;
+                    if (!bufferConsumer.isFinished()) {
+                        break;
+                    }
                 }
 
-                // if we have an empty finished buffer and the exclusive credit is 0, we just return
-                // the empty buffer so that the downstream task can release the allocated credit for
-                // this empty buffer, this happens in two main scenarios currently:
-                // 1. all data of a buffer builder has been read and after that the buffer builder
-                // is finished
-                // 2. in approximate recovery mode, a partial record takes a whole buffer builder
-                if (receiverExclusiveBuffersPerChannel == 0 && bufferConsumer.isFinished()) {
-                    break;
+                if (buffer == null) {
+                    return null;
                 }
 
-                if (buffer.readableBytes() > 0) {
-                    break;
+                if (buffer.getDataType().isBlockingUpstream()) {
+                    isBlocked = true;
                 }
-                buffer.recycleBuffer();
-                buffer = null;
-                if (!bufferConsumer.isFinished()) {
-                    break;
-                }
+
+                consumedBuffer.add(buffer);
+
+                updateStatistics(buffer);
+                // Do not report last remaining buffer on buffers as available to read (assuming it's
+                // unfinished).
+                // It will be reported for reading either on flush or when the number of buffers in the
+                // queue
+                // will be 2 or more.
+                NetworkActionsLogger.traceOutput(
+                        "PipelinedSubpartition#pollBuffer",
+                        buffer,
+                        parent.getOwningTaskName(),
+                        subpartitionInfo);
             }
-
-            if (buffer == null) {
-                return null;
-            }
-
-            if (buffer.getDataType().isBlockingUpstream()) {
-                isBlocked = true;
-            }
-
-            updateStatistics(buffer);
-            // Do not report last remaining buffer on buffers as available to read (assuming it's
-            // unfinished).
-            // It will be reported for reading either on flush or when the number of buffers in the
-            // queue
-            // will be 2 or more.
-            NetworkActionsLogger.traceOutput(
-                    "PipelinedSubpartition#pollBuffer",
-                    buffer,
-                    parent.getOwningTaskName(),
-                    subpartitionInfo);
             return new BufferAndBacklog(
                     buffer,
                     getBuffersInBacklogUnsafe(),
@@ -381,6 +407,14 @@ public class PipelinedSubpartition extends ResultSubpartition
             checkState(isBlocked, "Should be blocked by checkpoint.");
 
             isBlocked = false;
+        }
+    }
+
+    void resumeConsumption(boolean force) {
+        if (force) {
+            notifyDataAvailable();
+        } else {
+            resumeConsumption();
         }
     }
 
@@ -399,7 +433,7 @@ public class PipelinedSubpartition extends ResultSubpartition
         synchronized (buffers) {
             checkState(!isReleased);
             checkState(
-                    readView == null,
+                    readView == null || readView.isReleased(),
                     "Subpartition %s of is being (or already has been) consumed, "
                             + "but pipelined subpartitions can only be consumed once.",
                     getSubPartitionIndex(),
@@ -412,6 +446,8 @@ public class PipelinedSubpartition extends ResultSubpartition
                     parent.getPartitionId());
 
             readView = new PipelinedSubpartitionView(this, availabilityListener);
+            finishedReplayBuffer = false;
+            replayBufferOffset = 0;
         }
 
         return readView;

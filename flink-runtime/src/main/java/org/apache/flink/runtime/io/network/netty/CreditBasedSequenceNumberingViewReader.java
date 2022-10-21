@@ -113,7 +113,7 @@ class CreditBasedSequenceNumberingViewReader
             // consumer side for all floating buffers must have been released
             numCreditsAvailable = 0;
         }
-        subpartitionView.resumeConsumption();
+        subpartitionView.resumeConsumption(false);
     }
 
     @Override

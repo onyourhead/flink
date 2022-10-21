@@ -140,7 +140,7 @@ public class ChannelPersistenceITCase {
             if (type != ResultPartitionType.PIPELINED_APPROXIMATE) {
                 assertEquals(RECOVERY_COMPLETION, view.getNextBuffer().buffer().getDataType());
                 assertNull(view.getNextBuffer());
-                view.resumeConsumption();
+                view.resumeConsumption(false);
             }
             assertArrayEquals(dataAfterRecovery, collectBytes(view.getNextBuffer().buffer()));
         } finally {

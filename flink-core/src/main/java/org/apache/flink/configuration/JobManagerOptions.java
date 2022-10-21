@@ -284,7 +284,10 @@ public class JobManagerOptions {
                                                             + "More details can be found %s.",
                                                     link(
                                                             "{{.Site.BaseURL}}{{.Site.LanguagePrefix}}/docs/ops/state/task_failure_recovery/#restart-pipelined-region-failover-strategy",
-                                                            "here")))
+                                                            "here")),
+                                            text(
+                                                    "'single': Restarts failed tasks only and replay data from upstream."
+                                                           ))
                                     .build());
 
     /** The location where the JobManager stores the archives of completed jobs. */

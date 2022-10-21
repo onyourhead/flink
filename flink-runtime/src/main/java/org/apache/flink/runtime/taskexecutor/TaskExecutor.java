@@ -854,6 +854,29 @@ public class TaskExecutor extends RpcEndpoint implements TaskExecutorGateway {
         }
     }
 
+
+    public CompletableFuture<Acknowledge> suspendTaskWhenDownstreamTaskFailed(ExecutionAttemptID executionAttemptID, Time timeout) {
+        final Task task = taskSlotTable.getTask(executionAttemptID);
+
+        if (task != null) {
+            try {
+                task.suspendExecutionAndUploadOutputBuffer();
+                return CompletableFuture.completedFuture(Acknowledge.get());
+            } catch (Throwable t) {
+                return FutureUtils.completedExceptionally(
+                        new TaskException(
+                                "Cannot suspend task for execution " + executionAttemptID + '.', t));
+            }
+        } else {
+            final String message =
+                    "Cannot find task to suspend for execution " + executionAttemptID + '.';
+
+            log.debug(message);
+            return FutureUtils.completedExceptionally(new TaskException(message));
+        }
+
+    }
+
     // ----------------------------------------------------------------------
     // Partition lifecycle RPCs
     // ----------------------------------------------------------------------

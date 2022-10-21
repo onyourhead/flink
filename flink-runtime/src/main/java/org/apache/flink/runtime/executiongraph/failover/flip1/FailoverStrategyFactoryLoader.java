@@ -33,6 +33,8 @@ public final class FailoverStrategyFactoryLoader {
     /** Config name for the {@link RestartPipelinedRegionFailoverStrategy}. */
     public static final String PIPELINED_REGION_RESTART_STRATEGY_NAME = "region";
 
+    public static final String PIPELINED_SINGLE_RESTART_STRATEGY_NAME = "single";
+
     private FailoverStrategyFactoryLoader() {}
 
     /**
@@ -53,6 +55,9 @@ public final class FailoverStrategyFactoryLoader {
 
             case PIPELINED_REGION_RESTART_STRATEGY_NAME:
                 return new RestartPipelinedRegionFailoverStrategy.Factory();
+
+            case PIPELINED_SINGLE_RESTART_STRATEGY_NAME:
+                return new RestartPipelinedSinlgeFailoverStrategy.Factory();
 
             default:
                 throw new IllegalConfigurationException(

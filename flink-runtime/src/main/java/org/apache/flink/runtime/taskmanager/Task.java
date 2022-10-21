@@ -1279,6 +1279,49 @@ public class Task
         }
     }
 
+    void suspendExecutionAndUploadOutputBuffer(ExecutionState targetState) {
+        while (true) {
+            ExecutionState current = executionState;
+
+            // if the task is already canceled (or canceling) or finished or failed,
+            // then we need not do anything
+            if (current.isTerminal() || current == ExecutionState.CANCELING) {
+                LOG.info("Task {} is already in state {}", taskNameWithSubtask, current);
+                return;
+            }
+
+            if (current == ExecutionState.DEPLOYING || current == ExecutionState.CREATED) {
+                if (transitionState(current, targetState, null)) {
+                    // if we manage this state transition, then the invokable gets never called
+                    // we need not call cancel on it
+                    return;
+                }
+            } else if (current == ExecutionState.INITIALIZING
+                    || current == ExecutionState.RUNNING) {
+                if (transitionState(current, targetState, null)) {
+                    // we are canceling / failing out of the running state
+                    // we need to cancel the invokable
+
+                    // copy reference to guard against concurrent null-ing out the reference
+                    final TaskInvokable invokable = this.invokable;
+
+
+
+                    return;
+                }
+            } else {
+                throw new IllegalStateException(
+                        String.format(
+                                "Unexpected state: %s of task %s (%s).",
+                                current, taskNameWithSubtask, executionId));
+            }
+        }
+    }
+
+    void UploadOutputBuffer(ResultPartitionID resultPartitionID) {
+
+    }
+
     // ------------------------------------------------------------------------
     //  Partition State Listeners
     // ------------------------------------------------------------------------
@@ -1529,6 +1572,11 @@ public class Task
     @Override
     public String toString() {
         return String.format("%s (%s) [%s]", taskNameWithSubtask, executionId, executionState);
+    }
+
+    public void suspendExecutionAndUploadOutputBuffer() {
+        LOG.info("Attempting to suspend task {} ({}).", taskNameWithSubtask, executionId);
+        suspendExecutionAndUploadOutputBuffer(ExecutionState.SUSPENDED);
     }
 
     @VisibleForTesting

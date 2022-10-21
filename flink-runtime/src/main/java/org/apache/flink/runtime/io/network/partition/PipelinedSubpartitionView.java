@@ -75,8 +75,8 @@ public class PipelinedSubpartitionView implements ResultSubpartitionView {
     }
 
     @Override
-    public void resumeConsumption() {
-        parent.resumeConsumption();
+    public void resumeConsumption(boolean force) {
+        parent.resumeConsumption(force);
     }
 
     @Override

@@ -54,6 +54,8 @@ public enum ExecutionState {
 
     RUNNING,
 
+    SUSPENDED,
+
     /**
      * This state marks "successfully completed". It can only be reached when a program reaches the
      * "end of its input". The "end of input" can be reached when consuming a bounded input (fix set

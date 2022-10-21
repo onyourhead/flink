@@ -18,6 +18,7 @@
 
 package org.apache.flink.runtime.io.network.partition.consumer;
 
+import org.apache.flink.metrics.Counter;
 import org.apache.flink.runtime.checkpoint.CheckpointException;
 import org.apache.flink.runtime.checkpoint.channel.ChannelStateWriter;
 import org.apache.flink.runtime.event.TaskEvent;
@@ -58,7 +59,9 @@ class UnknownInputChannel extends InputChannel implements ChannelStateHolder {
 
     private final int networkBuffersPerChannel;
 
-    private final InputChannelMetrics metrics;
+    private final Counter numBytesInRemote;
+
+    private final Counter numBuffersInRemote;
 
     @Nullable private ChannelStateWriter channelStateWriter;
 
@@ -74,6 +77,33 @@ class UnknownInputChannel extends InputChannel implements ChannelStateHolder {
             int maxBackoff,
             int networkBuffersPerChannel,
             InputChannelMetrics metrics) {
+        this(
+                gate,
+                channelIndex,
+                partitionId,
+                consumedSubpartitionIndex,
+                partitionManager,
+                taskEventPublisher,
+                connectionManager,
+                initialBackoff,
+                maxBackoff,
+                networkBuffersPerChannel,
+                metrics.getNumBytesInRemoteCounter(),
+                metrics.getNumBuffersInRemoteCounter());
+    }
+    public UnknownInputChannel(
+            SingleInputGate gate,
+            int channelIndex,
+            ResultPartitionID partitionId,
+            int consumedSubpartitionIndex,
+            ResultPartitionManager partitionManager,
+            TaskEventPublisher taskEventPublisher,
+            ConnectionManager connectionManager,
+            int initialBackoff,
+            int maxBackoff,
+            int networkBuffersPerChannel,
+            Counter numBytesInRemote,
+            Counter numBuffersInRemote) {
 
         super(
                 gate,
@@ -85,17 +115,19 @@ class UnknownInputChannel extends InputChannel implements ChannelStateHolder {
                 null,
                 null);
 
-        this.partitionManager = checkNotNull(partitionManager);
-        this.taskEventPublisher = checkNotNull(taskEventPublisher);
-        this.connectionManager = checkNotNull(connectionManager);
-        this.metrics = checkNotNull(metrics);
+
+        this.partitionManager = partitionManager;
+        this.taskEventPublisher = taskEventPublisher;
+        this.connectionManager = connectionManager;
+        this.numBytesInRemote = numBytesInRemote;
+        this.numBuffersInRemote = numBuffersInRemote;
         this.initialBackoff = initialBackoff;
         this.maxBackoff = maxBackoff;
         this.networkBuffersPerChannel = networkBuffersPerChannel;
     }
 
     @Override
-    public void resumeConsumption() {
+    public void resumeConsumption(boolean force) {
         throw new UnsupportedOperationException("UnknownInputChannel should never be blocked.");
     }
 
@@ -169,8 +201,8 @@ class UnknownInputChannel extends InputChannel implements ChannelStateHolder {
                 initialBackoff,
                 maxBackoff,
                 networkBuffersPerChannel,
-                metrics.getNumBytesInRemoteCounter(),
-                metrics.getNumBuffersInRemoteCounter(),
+                numBytesInRemote,
+                numBuffersInRemote,
                 channelStateWriter == null ? ChannelStateWriter.NO_OP : channelStateWriter);
     }
 
@@ -184,8 +216,8 @@ class UnknownInputChannel extends InputChannel implements ChannelStateHolder {
                 taskEventPublisher,
                 initialBackoff,
                 maxBackoff,
-                metrics.getNumBytesInRemoteCounter(),
-                metrics.getNumBuffersInRemoteCounter(),
+                numBytesInRemote,
+                numBuffersInRemote,
                 channelStateWriter == null ? ChannelStateWriter.NO_OP : channelStateWriter);
     }
 
