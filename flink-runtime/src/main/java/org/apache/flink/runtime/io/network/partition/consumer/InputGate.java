@@ -82,6 +82,8 @@ public abstract class InputGate
 
     protected final AvailabilityHelper priorityAvailabilityHelper = new AvailabilityHelper();
 
+    protected UpstreamRecoveryTrackerControler upstreamRecoveryTrackerControler;
+
     @Override
     public void setChannelStateWriter(ChannelStateWriter channelStateWriter) {
         for (int index = 0, numChannels = getNumberOfInputChannels();
@@ -92,6 +94,10 @@ public abstract class InputGate
                 ((ChannelStateHolder) channel).setChannelStateWriter(channelStateWriter);
             }
         }
+    }
+
+    public void setUpstreamRecoveryTrackerControler(UpstreamRecoveryTrackerControler upstreamRecoveryTrackerControler) {
+        this.upstreamRecoveryTrackerControler = upstreamRecoveryTrackerControler;
     }
 
     public abstract int getNumberOfInputChannels();
@@ -152,6 +158,15 @@ public abstract class InputGate
      */
     public CompletableFuture<?> getPriorityEventAvailableFuture() {
         return priorityAvailabilityHelper.getAvailableFuture();
+    }
+
+    public void invokeUpstreamRecoveryTrackerControler() {
+        checkNotNull(upstreamRecoveryTrackerControler);
+        upstreamRecoveryTrackerControler.apply();
+    }
+
+    public interface UpstreamRecoveryTrackerControler {
+        void apply();
     }
 
     /** Simple pojo for INPUT, DATA and moreAvailable. */

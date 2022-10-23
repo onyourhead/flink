@@ -60,6 +60,7 @@ final class UpstreamRecoveryTrackerImpl implements UpstreamRecoveryTracker {
         this.restoredChannels = new HashSet<>();
         this.numUnrestoredChannels = inputGate.getNumberOfInputChannels();
         this.inputGate = inputGate;
+        this.inputGate.setUpstreamRecoveryTrackerControler(this::increaseNumofUnrestoredChannels);
     }
 
     @Override
@@ -76,6 +77,10 @@ final class UpstreamRecoveryTrackerImpl implements UpstreamRecoveryTracker {
                 restoredChannels.clear();
             }
         }
+    }
+
+    public void increaseNumofUnrestoredChannels() {
+        numUnrestoredChannels++;
     }
 
     @Override

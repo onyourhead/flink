@@ -121,6 +121,11 @@ public class InputGateWithMetrics extends IndexedInputGate {
     }
 
     @Override
+    public void setUpstreamRecoveryTrackerControler(UpstreamRecoveryTrackerControler upstreamRecoveryTrackerControler) {
+        inputGate.setUpstreamRecoveryTrackerControler(upstreamRecoveryTrackerControler);
+    }
+
+    @Override
     public Optional<BufferOrEvent> getNext() throws IOException, InterruptedException {
         return inputGate.getNext().map(this::updateMetrics);
     }

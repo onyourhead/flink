@@ -29,6 +29,7 @@ import org.apache.flink.api.common.time.Time;
 import org.apache.flink.configuration.ClusterOptions;
 import org.apache.flink.configuration.Configuration;
 import org.apache.flink.configuration.ConfigurationUtils;
+import org.apache.flink.configuration.GlobalFastConfiguration;
 import org.apache.flink.configuration.HighAvailabilityOptions;
 import org.apache.flink.configuration.IllegalConfigurationException;
 import org.apache.flink.core.execution.SavepointFormatType;
@@ -244,6 +245,7 @@ public class MiniCluster implements AutoCloseableAsync {
 
         this.miniClusterConfiguration =
                 checkNotNull(miniClusterConfiguration, "config may not be null");
+        GlobalFastConfiguration.INSTANCE.setFlinkConfig(miniClusterConfiguration.getConfiguration());
         this.rpcServices =
                 new ArrayList<>(
                         1

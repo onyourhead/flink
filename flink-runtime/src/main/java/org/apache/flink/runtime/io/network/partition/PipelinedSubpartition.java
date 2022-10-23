@@ -29,10 +29,14 @@ import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumerWithPartialRecordLength;
+import org.apache.flink.runtime.io.network.buffer.ReadOnlySlicedNetworkBuffer;
 import org.apache.flink.runtime.io.network.logger.NetworkActionsLogger;
 import org.apache.flink.runtime.io.network.partition.consumer.EndOfChannelStateEvent;
 
 import org.apache.flink.shaded.guava30.com.google.common.collect.Iterators;
+
+import org.apache.flink.shaded.netty4.io.netty.buffer.ByteBuf;
+import org.apache.flink.shaded.netty4.io.netty.buffer.Unpooled;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -110,7 +114,7 @@ public class PipelinedSubpartition extends ResultSubpartition
 
     private int lastCheckpointId;
 
-    private boolean finishedReplayBuffer = false;
+    private boolean finishedReplayBuffer = true;
 
     private int replayBufferOffset = 0;
 
@@ -324,6 +328,7 @@ public class PipelinedSubpartition extends ResultSubpartition
                 buffer = consumedBuffer.get(replayBufferOffset);
                 if (++replayBufferOffset == consumedBuffer.size()) {
                     finishedReplayBuffer = true;
+                    replayBufferOffset = 0;
                 }
             } else {
                 if (buffers.isEmpty()) {
@@ -376,11 +381,16 @@ public class PipelinedSubpartition extends ResultSubpartition
                     return null;
                 }
 
-                if (buffer.getDataType().isBlockingUpstream()) {
+                Buffer.DataType dataType = buffer.getDataType();
+                if (dataType.isBlockingUpstream()) {
                     isBlocked = true;
                 }
 
-                consumedBuffer.add(buffer);
+                if (dataType.isBuffer()) {
+                    if (buffer instanceof ReadOnlySlicedNetworkBuffer) {
+                        consumedBuffer.add((ReadOnlySlicedNetworkBuffer) Unpooled.copiedBuffer((ByteBuf) buffer));
+                    }
+                }
 
                 updateStatistics(buffer);
                 // Do not report last remaining buffer on buffers as available to read (assuming it's
@@ -445,9 +455,11 @@ public class PipelinedSubpartition extends ResultSubpartition
                     getSubPartitionIndex(),
                     parent.getPartitionId());
 
+            if (readView != null && readView.isReleased()) {
+                finishedReplayBuffer = false;
+                replayBufferOffset = 0;
+            }
             readView = new PipelinedSubpartitionView(this, availabilityListener);
-            finishedReplayBuffer = false;
-            replayBufferOffset = 0;
         }
 
         return readView;

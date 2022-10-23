@@ -601,6 +601,8 @@ public class SingleInputGate extends IndexedInputGate {
                     LOG.debug(
                             "{}: Updated unknown input channel to {}.", owningTaskName, newChannel);
 
+                    upstreamRecoveryTrackerControler.apply();
+
                     inputChannels.put(subpartitionInfo, newChannel);
                     channels[current.getChannelIndex()] = newChannel;
 
