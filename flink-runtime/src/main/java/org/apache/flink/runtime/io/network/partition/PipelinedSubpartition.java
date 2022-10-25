@@ -21,6 +21,7 @@ package org.apache.flink.runtime.io.network.partition;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.GlobalFastConfiguration;
 import org.apache.flink.runtime.checkpoint.channel.ChannelStateWriter;
+import org.apache.flink.runtime.checkpoint.channel.RecoveredChannelStateHandler;
 import org.apache.flink.runtime.event.AbstractEvent;
 import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
@@ -29,14 +30,16 @@ import org.apache.flink.runtime.io.network.buffer.Buffer;
 import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumerWithPartialRecordLength;
-import org.apache.flink.runtime.io.network.buffer.ReadOnlySlicedNetworkBuffer;
 import org.apache.flink.runtime.io.network.logger.NetworkActionsLogger;
 import org.apache.flink.runtime.io.network.partition.consumer.EndOfChannelStateEvent;
 
+import org.apache.flink.runtime.state.memory.MemCheckpointStreamFactory;
+
+import org.apache.flink.runtime.state.storage.JobManagerCheckpointStorage;
+
 import org.apache.flink.shaded.guava30.com.google.common.collect.Iterators;
 
-import org.apache.flink.shaded.netty4.io.netty.buffer.ByteBuf;
-import org.apache.flink.shaded.netty4.io.netty.buffer.Unpooled;
+import org.apache.flink.util.FlinkRuntimeException;
 
 import org.slf4j.Logger;
 import org.slf4j.LoggerFactory;
@@ -44,12 +47,15 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
+import java.io.ByteArrayInputStream;
+import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.List;
 
 import static java.util.Objects.requireNonNull;
+import static org.apache.flink.runtime.checkpoint.channel.ChannelStateByteBuffer.wrap;
 import static org.apache.flink.util.Preconditions.checkArgument;
 import static org.apache.flink.util.Preconditions.checkNotNull;
 import static org.apache.flink.util.Preconditions.checkState;
@@ -114,12 +120,20 @@ public class PipelinedSubpartition extends ResultSubpartition
 
     private int lastCheckpointId;
 
+    private boolean reconnectedFromDownStream = false;
+
     private boolean finishedReplayBuffer = true;
 
     private int replayBufferOffset = 0;
 
     /** Writes in-flight data. */
     private ChannelStateWriter channelStateWriter;
+
+    private PipelinedSubpartitionReplayBufferWriter replayBufferWriter;
+
+    private PipelinedSubpartitionBufferReplayer bufferReplayer;
+
+    private BufferConsumerWithPartialRecordLength bufferConsumerForReplay;
 
     private int bufferSize = Integer.MAX_VALUE;
 
@@ -142,6 +156,11 @@ public class PipelinedSubpartition extends ResultSubpartition
                 receiverExclusiveBuffersPerChannel >= 0,
                 "Buffers per channel must be non-negative.");
         this.receiverExclusiveBuffersPerChannel = receiverExclusiveBuffersPerChannel;
+        final MemCheckpointStreamFactory.MemoryCheckpointOutputStream bufferStream = new MemCheckpointStreamFactory.MemoryCheckpointOutputStream(
+                JobManagerCheckpointStorage.DEFAULT_MAX_STATE_SIZE);
+        this.replayBufferWriter = new PipelinedSubpartitionReplayBufferWriter(new DataOutputStream(
+                bufferStream));
+        this.bufferReplayer = new PipelinedSubpartitionBufferReplayer(bufferStream);
     }
 
     @Override
@@ -165,6 +184,12 @@ public class PipelinedSubpartition extends ResultSubpartition
         if (add(bufferConsumer, Integer.MIN_VALUE) == -1) {
             throw new IOException("Buffer consumer couldn't be added to ResultSubpartition");
         }
+    }
+
+    public void addReplayBufferConsumer(BufferConsumer bufferConsumer) {
+        bufferConsumerForReplay = new BufferConsumerWithPartialRecordLength(bufferConsumer, Integer.MIN_VALUE);
+        increaseBuffersInBacklog(bufferConsumer);
+        notifyDataAvailable();
     }
 
     @Override
@@ -324,86 +349,98 @@ public class PipelinedSubpartition extends ResultSubpartition
 
             Buffer buffer = null;
 
-            if (GlobalFastConfiguration.INSTANCE.isSingleTaskRecover() && !consumedBuffer.isEmpty() && !finishedReplayBuffer) {
-                buffer = consumedBuffer.get(replayBufferOffset);
-                if (++replayBufferOffset == consumedBuffer.size()) {
-                    finishedReplayBuffer = true;
-                    replayBufferOffset = 0;
+            if (GlobalFastConfiguration.INSTANCE.isSingleTaskRecover()
+                    && !replayBufferWriter.isEmpty() && !finishedReplayBuffer) {
+                try {
+                    bufferReplayer.readAndRecoverBuffer(this);
+                } catch (IOException | InterruptedException e) {
+                    throw new FlinkRuntimeException("can't recover buffer that for replay", e);
                 }
-            } else {
-                if (buffers.isEmpty()) {
+                finishedReplayBuffer = true;
+            }
+
+            if (buffers.isEmpty()) {
+                flushRequested = false;
+            }
+
+            while (!buffers.isEmpty() || bufferConsumerForReplay != null) {
+                BufferConsumerWithPartialRecordLength bufferConsumerWithPartialRecordLength;
+                if (bufferConsumerForReplay != null) {
+                    bufferConsumerWithPartialRecordLength = bufferConsumerForReplay;
+                } else {
+                    bufferConsumerWithPartialRecordLength= buffers.peek();
+                }
+                BufferConsumer bufferConsumer =
+                        bufferConsumerWithPartialRecordLength.getBufferConsumer();
+
+                buffer = buildSliceBuffer(bufferConsumerWithPartialRecordLength);
+
+//                checkState(
+//                        bufferConsumer.isFinished() || buffers.size() == 1,
+//                        "When there are multiple buffers, an unfinished bufferConsumer can not be at the head of the buffers queue.");
+
+                if (buffers.size() == 1) {
+                    // turn off flushRequested flag if we drained all of the available data
                     flushRequested = false;
                 }
 
-                while (!buffers.isEmpty()) {
-                    BufferConsumerWithPartialRecordLength bufferConsumerWithPartialRecordLength =
-                            buffers.peek();
-                    BufferConsumer bufferConsumer =
-                            bufferConsumerWithPartialRecordLength.getBufferConsumer();
-
-                    buffer = buildSliceBuffer(bufferConsumerWithPartialRecordLength);
-
-                    checkState(
-                            bufferConsumer.isFinished() || buffers.size() == 1,
-                            "When there are multiple buffers, an unfinished bufferConsumer can not be at the head of the buffers queue.");
-
-                    if (buffers.size() == 1) {
-                        // turn off flushRequested flag if we drained all of the available data
-                        flushRequested = false;
+                if (bufferConsumer.isFinished()) {
+                    BufferConsumerWithPartialRecordLength toCloseBuffer;
+                    if (bufferConsumerWithPartialRecordLength != buffers.peek()) {
+                        toCloseBuffer = bufferConsumerForReplay;
+                        bufferConsumerForReplay = null;
+                    } else {
+                        toCloseBuffer = buffers.poll();
                     }
-
-                    if (bufferConsumer.isFinished()) {
-                        requireNonNull(buffers.poll()).getBufferConsumer().close();
-                        decreaseBuffersInBacklogUnsafe(bufferConsumer.isBuffer());
-                    }
-
-                    // if we have an empty finished buffer and the exclusive credit is 0, we just return
-                    // the empty buffer so that the downstream task can release the allocated credit for
-                    // this empty buffer, this happens in two main scenarios currently:
-                    // 1. all data of a buffer builder has been read and after that the buffer builder
-                    // is finished
-                    // 2. in approximate recovery mode, a partial record takes a whole buffer builder
-                    if (receiverExclusiveBuffersPerChannel == 0 && bufferConsumer.isFinished()) {
-                        break;
-                    }
-
-                    if (buffer.readableBytes() > 0) {
-                        break;
-                    }
-                    buffer.recycleBuffer();
-                    buffer = null;
-                    if (!bufferConsumer.isFinished()) {
-                        break;
-                    }
+                    requireNonNull(toCloseBuffer).getBufferConsumer().close();
+                    decreaseBuffersInBacklogUnsafe(bufferConsumer.isBuffer());
                 }
 
-                if (buffer == null) {
-                    return null;
+                // if we have an empty finished buffer and the exclusive credit is 0, we just return
+                // the empty buffer so that the downstream task can release the allocated credit for
+                // this empty buffer, this happens in two main scenarios currently:
+                // 1. all data of a buffer builder has been read and after that the buffer builder
+                // is finished
+                // 2. in approximate recovery mode, a partial record takes a whole buffer builder
+                if (receiverExclusiveBuffersPerChannel == 0 && bufferConsumer.isFinished()) {
+                    break;
                 }
 
-                Buffer.DataType dataType = buffer.getDataType();
-                if (dataType.isBlockingUpstream()) {
-                    isBlocked = true;
+                if (buffer.readableBytes() > 0) {
+                    break;
                 }
-
-                if (dataType.isBuffer()) {
-                    if (buffer instanceof ReadOnlySlicedNetworkBuffer) {
-                        consumedBuffer.add((ReadOnlySlicedNetworkBuffer) Unpooled.copiedBuffer((ByteBuf) buffer));
-                    }
+                buffer.recycleBuffer();
+                buffer = null;
+                if (!bufferConsumer.isFinished()) {
+                    break;
                 }
-
-                updateStatistics(buffer);
-                // Do not report last remaining buffer on buffers as available to read (assuming it's
-                // unfinished).
-                // It will be reported for reading either on flush or when the number of buffers in the
-                // queue
-                // will be 2 or more.
-                NetworkActionsLogger.traceOutput(
-                        "PipelinedSubpartition#pollBuffer",
-                        buffer,
-                        parent.getOwningTaskName(),
-                        subpartitionInfo);
             }
+
+            if (buffer == null) {
+                return null;
+            }
+
+            Buffer.DataType dataType = buffer.getDataType();
+            if (dataType.isBlockingUpstream()) {
+                isBlocked = true;
+            }
+
+            if (dataType.isBuffer() && finishedReplayBuffer) {
+                replayBufferWriter.writeReplayBuffer(buffer);
+//                    consumedBuffer.add(buffer.copyBuffer());
+            }
+
+            updateStatistics(buffer);
+            // Do not report last remaining buffer on buffers as available to read (assuming it's
+            // unfinished).
+            // It will be reported for reading either on flush or when the number of buffers in the
+            // queue
+            // will be 2 or more.
+            NetworkActionsLogger.traceOutput(
+                    "PipelinedSubpartition#pollBuffer",
+                    buffer,
+                    parent.getOwningTaskName(),
+                    subpartitionInfo);
             return new BufferAndBacklog(
                     buffer,
                     getBuffersInBacklogUnsafe(),
@@ -411,6 +448,8 @@ public class PipelinedSubpartition extends ResultSubpartition
                     sequenceNumber++);
         }
     }
+
+
 
     void resumeConsumption() {
         synchronized (buffers) {

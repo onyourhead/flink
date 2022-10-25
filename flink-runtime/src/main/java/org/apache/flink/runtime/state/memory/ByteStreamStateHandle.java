@@ -102,7 +102,7 @@ public class ByteStreamStateHandle implements StreamStateHandle {
     }
 
     /** An input stream view on a byte array. */
-    private static final class ByteStateHandleInputStream extends FSDataInputStream {
+    public static final class ByteStateHandleInputStream extends FSDataInputStream {
 
         private final byte[] data;
         private int index;

@@ -167,6 +167,11 @@ public class NetworkBuffer extends AbstractReferenceCountedByteBuf implements Bu
     }
 
     @Override
+    public Buffer copyBuffer() {
+        return (NetworkBuffer) super.copy();
+    }
+
+    @Override
     public ReadOnlySlicedNetworkBuffer readOnlySlice() {
         return readOnlySlice(readerIndex(), readableBytes());
     }

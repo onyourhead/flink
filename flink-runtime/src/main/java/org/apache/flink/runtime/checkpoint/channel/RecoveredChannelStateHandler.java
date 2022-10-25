@@ -40,12 +40,12 @@ import java.util.stream.Collectors;
 
 import static org.apache.flink.runtime.checkpoint.channel.ChannelStateByteBuffer.wrap;
 
-interface RecoveredChannelStateHandler<Info, Context> extends AutoCloseable {
+public interface RecoveredChannelStateHandler<Info, Context> extends AutoCloseable {
     class BufferWithContext<Context> {
-        final ChannelStateByteBuffer buffer;
-        final Context context;
+        public final ChannelStateByteBuffer buffer;
+        public final Context context;
 
-        BufferWithContext(ChannelStateByteBuffer buffer, Context context) {
+        public BufferWithContext(ChannelStateByteBuffer buffer, Context context) {
             this.buffer = buffer;
             this.context = context;
         }

@@ -194,6 +194,11 @@ public class FileRegionBuffer extends DefaultFileRegion implements Buffer {
     }
 
     @Override
+    public Buffer copyBuffer() {
+        throw new UnsupportedOperationException();
+    }
+
+    @Override
     public boolean isCompressed() {
         return isCompressed;
     }

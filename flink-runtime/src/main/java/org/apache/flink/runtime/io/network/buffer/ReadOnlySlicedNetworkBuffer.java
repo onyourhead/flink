@@ -131,6 +131,11 @@ public final class ReadOnlySlicedNetworkBuffer extends ReadOnlyByteBuf implement
     }
 
     @Override
+    public Buffer copyBuffer() {
+        return getBuffer().copyBuffer();
+    }
+
+    @Override
     public ReadOnlySlicedNetworkBuffer readOnlySlice() {
         return readOnlySlice(readerIndex(), readableBytes());
     }

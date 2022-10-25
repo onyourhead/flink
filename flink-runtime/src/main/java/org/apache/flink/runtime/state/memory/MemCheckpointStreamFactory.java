@@ -159,6 +159,12 @@ public class MemCheckpointStreamFactory implements CheckpointStreamFactory {
             }
         }
 
+        public byte[] flushAndGetBytes() throws IOException {
+            checkSize(os.size(), maxSize);
+            flush();
+            return os.toByteArray();
+        }
+
         private void closeInternal() {
             os.reset();
         }

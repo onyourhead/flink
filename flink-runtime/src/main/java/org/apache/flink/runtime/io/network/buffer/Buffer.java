@@ -110,6 +110,9 @@ public interface Buffer {
      */
     Buffer retainBuffer();
 
+
+    Buffer copyBuffer();
+
     /**
      * Returns a read-only slice of this buffer's readable bytes, i.e. between {@link
      * #getReaderIndex()} and {@link #getSize()}.
