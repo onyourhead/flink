@@ -6,6 +6,7 @@ import org.apache.flink.runtime.checkpoint.channel.ChannelStateSerializerImpl;
 import org.apache.flink.runtime.checkpoint.channel.RecoveredChannelStateHandler;
 import org.apache.flink.runtime.io.network.buffer.BufferBuilder;
 import org.apache.flink.runtime.io.network.buffer.BufferConsumer;
+import org.apache.flink.runtime.state.AbstractChannelStateHandle;
 import org.apache.flink.runtime.state.memory.ByteStreamStateHandle;
 import org.apache.flink.runtime.state.memory.MemCheckpointStreamFactory;
 
@@ -22,15 +23,25 @@ public class PipelinedSubpartitionBufferReplayer {
 
     private final ChannelStateSerializer serializer;
     private final MemCheckpointStreamFactory.MemoryCheckpointOutputStream outputStream;
+    private final AbstractChannelStateHandle.StateContentMetaInfo contentMetaInfo;
 
-    public PipelinedSubpartitionBufferReplayer(MemCheckpointStreamFactory.MemoryCheckpointOutputStream outputStream) {
+
+    public PipelinedSubpartitionBufferReplayer(MemCheckpointStreamFactory.MemoryCheckpointOutputStream outputStream,
+                                               AbstractChannelStateHandle.StateContentMetaInfo contentMetaInfo) {
         this.outputStream = outputStream;
         this.serializer = new ChannelStateSerializerImpl();
+        this.contentMetaInfo = contentMetaInfo;
     }
 
      void readAndRecoverBuffer(PipelinedSubpartition pipelinedSubpartition) throws IOException, InterruptedException {
+         byte[] bytes = outputStream.flushAndGetBytes();
+         byte[] merge = serializer.extractAndMerge(bytes, contentMetaInfo.getOffsets());
          try (FSDataInputStream source = new ByteStreamStateHandle.ByteStateHandleInputStream(
-                 outputStream.flushAndGetBytes())) {
+                 merge)) {
+             long headerLength = serializer.getHeaderLength();
+             if (source.getPos() != headerLength) {
+                 source.seek(headerLength);
+             }
              int length = serializer.readLength(source);
              while (length > 0) {
                  RecoveredChannelStateHandler.BufferWithContext<BufferBuilder> bufferWithContext =

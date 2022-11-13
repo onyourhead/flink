@@ -33,6 +33,7 @@ import org.apache.flink.runtime.io.network.buffer.BufferConsumerWithPartialRecor
 import org.apache.flink.runtime.io.network.logger.NetworkActionsLogger;
 import org.apache.flink.runtime.io.network.partition.consumer.EndOfChannelStateEvent;
 
+import org.apache.flink.runtime.state.AbstractChannelStateHandle;
 import org.apache.flink.runtime.state.memory.MemCheckpointStreamFactory;
 
 import org.apache.flink.runtime.state.storage.JobManagerCheckpointStorage;
@@ -158,9 +159,9 @@ public class PipelinedSubpartition extends ResultSubpartition
         this.receiverExclusiveBuffersPerChannel = receiverExclusiveBuffersPerChannel;
         final MemCheckpointStreamFactory.MemoryCheckpointOutputStream bufferStream = new MemCheckpointStreamFactory.MemoryCheckpointOutputStream(
                 JobManagerCheckpointStorage.DEFAULT_MAX_STATE_SIZE);
-        this.replayBufferWriter = new PipelinedSubpartitionReplayBufferWriter(new DataOutputStream(
-                bufferStream));
-        this.bufferReplayer = new PipelinedSubpartitionBufferReplayer(bufferStream);
+        AbstractChannelStateHandle.StateContentMetaInfo contentMetaInfo = new AbstractChannelStateHandle.StateContentMetaInfo();
+        this.replayBufferWriter = new PipelinedSubpartitionReplayBufferWriter(bufferStream, contentMetaInfo);
+        this.bufferReplayer = new PipelinedSubpartitionBufferReplayer(bufferStream, contentMetaInfo);
     }
 
     @Override
