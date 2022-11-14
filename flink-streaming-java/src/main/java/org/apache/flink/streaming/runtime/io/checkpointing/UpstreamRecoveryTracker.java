@@ -54,6 +54,8 @@ public interface UpstreamRecoveryTracker {
 final class UpstreamRecoveryTrackerImpl implements UpstreamRecoveryTracker {
     private final HashSet<InputChannelInfo> restoredChannels;
     private int numUnrestoredChannels;
+
+    private int numToReconnectChannels = 0;
     private final InputGate inputGate;
 
     UpstreamRecoveryTrackerImpl(InputGate inputGate) {
@@ -77,10 +79,13 @@ final class UpstreamRecoveryTrackerImpl implements UpstreamRecoveryTracker {
                 restoredChannels.clear();
             }
         }
+        if (numToReconnectChannels == 1) {
+            inputGate.resumeConsumption(channelInfo);
+        }
     }
 
     public void increaseNumofUnrestoredChannels() {
-        numUnrestoredChannels++;
+        numToReconnectChannels++;
     }
 
     @Override

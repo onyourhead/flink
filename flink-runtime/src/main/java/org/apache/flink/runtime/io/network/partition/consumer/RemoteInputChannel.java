@@ -29,6 +29,7 @@ import org.apache.flink.runtime.execution.CancelTaskException;
 import org.apache.flink.runtime.io.network.ConnectionID;
 import org.apache.flink.runtime.io.network.ConnectionManager;
 import org.apache.flink.runtime.io.network.PartitionRequestClient;
+import org.apache.flink.runtime.io.network.TaskEventPublisher;
 import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EventAnnouncement;
 import org.apache.flink.runtime.io.network.api.serialization.EventSerializer;
@@ -39,6 +40,7 @@ import org.apache.flink.runtime.io.network.logger.NetworkActionsLogger;
 import org.apache.flink.runtime.io.network.partition.PartitionNotFoundException;
 import org.apache.flink.runtime.io.network.partition.PrioritizedDeque;
 import org.apache.flink.runtime.io.network.partition.ResultPartitionID;
+import org.apache.flink.runtime.io.network.partition.ResultPartitionManager;
 import org.apache.flink.util.ExceptionUtils;
 
 import org.apache.flink.shaded.guava30.com.google.common.collect.Iterators;
@@ -78,6 +80,10 @@ public class RemoteInputChannel extends InputChannel {
 
     /** The connection manager to use connect to the remote partition provider. */
     private final ConnectionManager connectionManager;
+
+    private ResultPartitionManager partitionManager;
+
+    private TaskEventPublisher taskEventPublisher;
 
     /**
      * The received buffers. Received buffers are enqueued by the network I/O thread and the queue
@@ -145,6 +151,37 @@ public class RemoteInputChannel extends InputChannel {
         this.connectionManager = checkNotNull(connectionManager);
         this.bufferManager = new BufferManager(inputGate.getMemorySegmentProvider(), this, 0);
         this.channelStatePersister = new ChannelStatePersister(stateWriter, getChannelInfo());
+    }
+
+    public RemoteInputChannel(
+            SingleInputGate inputGate,
+            int channelIndex,
+            ResultPartitionID partitionId,
+            ResultPartitionManager partitionManager,
+            TaskEventPublisher taskEventPublisher,
+            int consumedSubpartitionIndex,
+            ConnectionID connectionId,
+            ConnectionManager connectionManager,
+            int initialBackOff,
+            int maxBackoff,
+            int networkBuffersPerChannel,
+            Counter numBytesIn,
+            Counter numBuffersIn,
+            ChannelStateWriter stateWriter) {
+        this(inputGate,
+                channelIndex,
+                partitionId,
+                consumedSubpartitionIndex,
+                connectionId,
+                connectionManager,
+                initialBackOff,
+                maxBackoff,
+                networkBuffersPerChannel,
+                numBytesIn,
+                numBuffersIn,
+                stateWriter);
+        this.partitionManager = partitionManager;
+        this.taskEventPublisher = taskEventPublisher;
     }
 
     public int getExpectedSequenceNumber() {

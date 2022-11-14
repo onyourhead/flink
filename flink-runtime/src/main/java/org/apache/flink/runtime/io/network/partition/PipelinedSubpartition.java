@@ -358,6 +358,7 @@ public class PipelinedSubpartition extends ResultSubpartition
                     throw new FlinkRuntimeException("can't recover buffer that for replay", e);
                 }
                 finishedReplayBuffer = true;
+                sequenceNumber = 0;
             }
 
             if (buffers.isEmpty()) {

@@ -24,6 +24,7 @@ import org.apache.flink.runtime.checkpoint.CheckpointException;
 import org.apache.flink.runtime.checkpoint.channel.ChannelStateWriter;
 import org.apache.flink.runtime.event.TaskEvent;
 import org.apache.flink.runtime.execution.CancelTaskException;
+import org.apache.flink.runtime.io.network.ConnectionManager;
 import org.apache.flink.runtime.io.network.TaskEventPublisher;
 import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.buffer.Buffer;
@@ -58,6 +59,10 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
     // ------------------------------------------------------------------------
 
     private final Object requestLock = new Object();
+
+    private ConnectionManager connectionManager;
+
+    private int networkBuffersPerChannel;
 
     /** The local partition manager. */
     private final ResultPartitionManager partitionManager;
@@ -100,6 +105,34 @@ public class LocalInputChannel extends InputChannel implements BufferAvailabilit
         this.channelStatePersister = new ChannelStatePersister(stateWriter, getChannelInfo());
     }
 
+    public LocalInputChannel(
+            SingleInputGate inputGate,
+            int channelIndex,
+            ResultPartitionID partitionId,
+            int consumedSubpartitionIndex,
+            ResultPartitionManager partitionManager,
+            TaskEventPublisher taskEventPublisher,
+            ConnectionManager connectionManager,
+            int initialBackoff,
+            int maxBackoff,
+            int networkBuffersPerChannel,
+            Counter numBytesIn,
+            Counter numBuffersIn,
+            ChannelStateWriter stateWriter) {
+        this(inputGate,
+                channelIndex,
+                partitionId,
+                consumedSubpartitionIndex,
+                partitionManager,
+                taskEventPublisher,
+                initialBackoff,
+                maxBackoff,
+                numBytesIn,
+                numBuffersIn,
+                stateWriter);
+        this.connectionManager  = connectionManager;
+        this.networkBuffersPerChannel = networkBuffersPerChannel;
+    }
     // ------------------------------------------------------------------------
     // Consume
     // ------------------------------------------------------------------------

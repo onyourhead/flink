@@ -594,7 +594,7 @@ public class SingleInputGate extends IndexedInputGate {
                                         shuffleDescriptor.getConnectionId());
                         remoteInputChannel.setup();
                         if (oldExpectedSequenceNumber != 0){
-                            remoteInputChannel.setExpectedSequenceNumber(oldExpectedSequenceNumber);
+//                            remoteInputChannel.setExpectedSequenceNumber(oldExpectedSequenceNumber);
                         }
                         newChannel = remoteInputChannel;
                     }
