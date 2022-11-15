@@ -20,6 +20,7 @@ package org.apache.flink.streaming.runtime.io;
 import org.apache.flink.api.common.typeutils.TypeSerializer;
 import org.apache.flink.runtime.checkpoint.channel.InputChannelInfo;
 import org.apache.flink.runtime.event.AbstractEvent;
+import org.apache.flink.runtime.io.network.api.ClearLocalDataEvent;
 import org.apache.flink.runtime.io.network.api.EndOfData;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
 import org.apache.flink.runtime.io.network.api.serialization.RecordDeserializer;
@@ -171,6 +172,8 @@ public abstract class AbstractStreamTaskNetworkInput<
             if (checkpointedInputGate.allChannelsRecovered()) {
                 return DataInputStatus.END_OF_RECOVERY;
             }
+        } else if (event.getClass() == ClearLocalDataEvent.class) {
+            recordDeserializers.clear();
         }
         return DataInputStatus.MORE_AVAILABLE;
     }
