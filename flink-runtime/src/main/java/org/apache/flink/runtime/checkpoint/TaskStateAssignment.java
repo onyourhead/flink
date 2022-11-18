@@ -135,6 +135,7 @@ class TaskStateAssignment {
             downstreamAssignments =
                     Arrays.stream(executionJobVertex.getProducedDataSets())
                             .map(result -> consumerAssignment.get(result.getId()))
+                            .filter(Objects::nonNull)
                             .toArray(TaskStateAssignment[]::new);
         }
         return downstreamAssignments;
@@ -150,6 +151,7 @@ class TaskStateAssignment {
             upstreamAssignments =
                     executionJobVertex.getInputs().stream()
                             .map(result -> vertexAssignments.get(result.getProducer()))
+                            .filter(Objects::nonNull)
                             .toArray(TaskStateAssignment[]::new);
         }
         return upstreamAssignments;
