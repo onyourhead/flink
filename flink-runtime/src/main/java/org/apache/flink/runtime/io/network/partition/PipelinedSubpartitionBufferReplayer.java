@@ -74,4 +74,8 @@ public class PipelinedSubpartitionBufferReplayer {
         BufferBuilder bufferBuilder = pipelinedSubpartition.requestBufferBuilderBlocking();
         return new RecoveredChannelStateHandler.BufferWithContext<>(wrap(bufferBuilder), bufferBuilder);
     }
+
+    public void close() {
+        outputStream.close();
+    }
 }

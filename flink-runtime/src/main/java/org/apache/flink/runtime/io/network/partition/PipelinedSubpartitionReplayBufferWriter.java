@@ -53,4 +53,8 @@ public class PipelinedSubpartitionReplayBufferWriter {
     public DataOutputStream getDataStream() {
         return dataStream;
     }
+
+    public void close() throws IOException {
+        dataStream.close();
+    }
 }

@@ -21,7 +21,6 @@ package org.apache.flink.runtime.io.network.partition;
 import org.apache.flink.annotation.VisibleForTesting;
 import org.apache.flink.configuration.GlobalFastConfiguration;
 import org.apache.flink.runtime.checkpoint.channel.ChannelStateWriter;
-import org.apache.flink.runtime.checkpoint.channel.RecoveredChannelStateHandler;
 import org.apache.flink.runtime.event.AbstractEvent;
 import org.apache.flink.runtime.io.network.api.CheckpointBarrier;
 import org.apache.flink.runtime.io.network.api.EndOfPartitionEvent;
@@ -48,8 +47,6 @@ import org.slf4j.LoggerFactory;
 import javax.annotation.Nullable;
 import javax.annotation.concurrent.GuardedBy;
 
-import java.io.ByteArrayInputStream;
-import java.io.DataOutputStream;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -157,11 +154,16 @@ public class PipelinedSubpartition extends ResultSubpartition
                 receiverExclusiveBuffersPerChannel >= 0,
                 "Buffers per channel must be non-negative.");
         this.receiverExclusiveBuffersPerChannel = receiverExclusiveBuffersPerChannel;
-        final MemCheckpointStreamFactory.MemoryCheckpointOutputStream bufferStream = new MemCheckpointStreamFactory.MemoryCheckpointOutputStream(
+        initBufferReplayComponent();
+    }
+
+
+    public void initBufferReplayComponent() {
+        MemCheckpointStreamFactory.MemoryCheckpointOutputStream bufferStreamForReplay= new MemCheckpointStreamFactory.MemoryCheckpointOutputStream(
                 JobManagerCheckpointStorage.DEFAULT_MAX_STATE_SIZE);
         AbstractChannelStateHandle.StateContentMetaInfo contentMetaInfo = new AbstractChannelStateHandle.StateContentMetaInfo();
-        this.replayBufferWriter = new PipelinedSubpartitionReplayBufferWriter(bufferStream, contentMetaInfo);
-        this.bufferReplayer = new PipelinedSubpartitionBufferReplayer(bufferStream, contentMetaInfo);
+        this.replayBufferWriter = new PipelinedSubpartitionReplayBufferWriter(bufferStreamForReplay, contentMetaInfo);
+        this.bufferReplayer = new PipelinedSubpartitionBufferReplayer(bufferStreamForReplay, contentMetaInfo);
     }
 
     @Override
@@ -245,6 +247,13 @@ public class PipelinedSubpartition extends ResultSubpartition
         if (bufferConsumer.getDataType().hasPriority()) {
             return processPriorityBuffer(bufferConsumer, partialRecordLength);
         }
+        if (bufferConsumer.getDataType().isEvent()) {
+            CheckpointBarrier barrier = parseCheckpointBarrier(bufferConsumer);
+            if (barrier != null) {
+                closeBufferReplayComponent();
+                initBufferReplayComponent();
+            }
+        }
         buffers.add(new BufferConsumerWithPartialRecordLength(bufferConsumer, partialRecordLength));
         return false;
     }
@@ -282,6 +291,15 @@ public class PipelinedSubpartition extends ResultSubpartition
         return numPriorityElements == 1
                 && !isBlocked; // if subpartition is blocked then downstream doesn't expect any
         // notifications
+    }
+
+    public void closeBufferReplayComponent() {
+        try {
+            replayBufferWriter.close();
+            bufferReplayer.close();
+        } catch (IOException e) {
+            throw new FlinkRuntimeException("close bufferReplay component failed ");
+        }
     }
 
     public void uploadConsumedBuffer() {
